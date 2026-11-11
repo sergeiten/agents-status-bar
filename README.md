@@ -41,18 +41,19 @@ Or just run `brew upgrade --cask claude-status-bar` (brew), or download the late
 - **Thinking / working** — the icon animates, with a live `1m 1s` timer.
 - **Running a tool** — a short label (`Editing`, `Reading`, `Running command`, `Using tool`, …).
 - **Awaiting permission** — a paused yellow dot, in both the CLI and the Desktop app.
-- **Idle / done** — rests on the Claude logo.
+- **Idle / done** — rests on the tündük mark (Clawd™ keeps its crab).
 
 Everything is controlled from the menu:
 
 - **Show timer:** toggle the elapsed `1m 1s` clock.
 - **Show text:** show the status label next to the icon (`Manifesting…`, `Percolating…`, `Editing`, `Running command`), or turn it off for an icon-only menu bar (on by default).
 - **Animation style:**
+  - **Tündük** (default), the Kyrgyz tündük crown, gently swaying while agents work
   - **Spark**, the web/chat "morph" spark
   - **Unicode**, the terminal glyph spinner
   - **Clawd™**, a pixel-art Clawd crab that scuttles while Claude works
   - **Orbit**, three dots that orbit, merge and breathe
-- **Icon color:** **Orange** or **System** (adaptive black/white). All four styles follow this setting: in System mode Clawd™ renders as a shaded monochrome silhouette that matches the menu bar.
+- **Icon color:** **Gold** or **System** (adaptive black/white) for Tündük; **Orange** or **System** for the other styles. Existing animation and color preferences are preserved. Tündük stays still when macOS Reduce Motion is enabled. In System mode Clawd™ renders as a shaded monochrome silhouette that matches the menu bar.
 - **Version and update:** the menu shows your current version and tells you when an update is ready (see [Updating](#updating)).
 
 ### Where it works

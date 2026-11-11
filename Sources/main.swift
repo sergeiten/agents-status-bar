@@ -322,6 +322,8 @@ final class StatusController: NSObject, NSMenuDelegate {
     var animTimer: Timer?
     var frameIdx = 0
     var markOutro = false
+    // Tündük stop transition: the frame the animation stopped on, and how far into the outro we are.
+    var tundukOutro: (from: Int, step: Int)? = nil
 
     let launchedAt = Date()
     var notNeededSince: Date?
@@ -394,10 +396,10 @@ final class StatusController: NSObject, NSMenuDelegate {
     let frames: [NSImage] = StatusController.loadFrames()
     let spriteFPS: Double = 9 // tune: 8 frames per loop -> ~0.9s/cycle
 
-    enum AnimStyle: String { case web, code, crab, mark }
-    var animStyle: AnimStyle = .web
+    enum AnimStyle: String { case web, code, crab, mark, tunduk }
+    var animStyle: AnimStyle = .tunduk
     var showTimer = false
-    var iconSystem = false // false = brand Orange; true = adaptive black/white (template image)
+    var iconSystem = false // false = style's colors; true = adaptive black/white (template image)
     var showLabel = true
     var sessionWord: [String: String] = [:] // id -> current thinking word; re-picked on each entry into "thinking"
     var soundThreshold: Double = 0  // 0 = off; else the min turn length (seconds) that chimes on completion
@@ -493,6 +495,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         case .code: return Double(codeGlyphs.count * codeSub) / codeCycle
         case .crab: return crabFPS
         case .mark: return markFPS
+        case .tunduk: return TundukRenderer.framesPerSecond
         }
     }
     var frameCount: Int {
@@ -501,6 +504,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         case .code: return codeGlyphs.count * codeSub
         case .crab: return max(1, crabFrames.count)
         case .mark: return max(1, markBodyCount)
+        case .tunduk: return TundukRenderer.frameCount
         }
     }
     var loopStart: Int { animStyle == .mark ? markLoopStart : 0 }
@@ -753,7 +757,7 @@ final class StatusController: NSObject, NSMenuDelegate {
 
         let animParent = NSMenuItem(title: "Animation", action: nil, keyEquivalent: "")
         let animSub = NSMenu()
-        for (style, name) in [(AnimStyle.web, "Spark"), (AnimStyle.code, "Unicode"), (AnimStyle.crab, "Clawd™"), (AnimStyle.mark, "Orbit")] {
+        for (style, name) in [(AnimStyle.tunduk, "Tündük"), (AnimStyle.web, "Spark"), (AnimStyle.code, "Unicode"), (AnimStyle.crab, "Clawd™"), (AnimStyle.mark, "Orbit")] {
             let it = NSMenuItem(title: name, action: #selector(chooseStyle(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = style.rawValue
@@ -765,7 +769,7 @@ final class StatusController: NSObject, NSMenuDelegate {
 
         let colorParent = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
         let colorSub = NSMenu()
-        for (sys, name) in [(false, "Orange"), (true, "System")] {
+        for (sys, name) in [(false, animStyle == .tunduk ? "Gold" : "Orange"), (true, "System")] {
             let it = NSMenuItem(title: name, action: #selector(chooseColor(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = sys
@@ -1101,6 +1105,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         loadMarkConfig()
         animTimer?.invalidate(); animTimer = nil // recreate at the new style's fps
         markOutro = false
+        tundukOutro = nil
         frameIdx = 0
         evaluate()
     }
@@ -1388,8 +1393,10 @@ final class StatusController: NSObject, NSMenuDelegate {
         activeColor = color
         self.startedAt = startedAt
 
-        if animate {
+        let reduceMotion = animStyle == .tunduk && NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if animate && !reduceMotion {
             markOutro = false
+            tundukOutro = nil   // resumed mid-outro: keep spinning from the current frame
             if animTimer == nil {
                 let t = Timer(timeInterval: 1.0 / fps, repeats: true) { [weak self] _ in self?.animStep() }
                 RunLoop.main.add(t, forMode: .common)
@@ -1397,11 +1404,15 @@ final class StatusController: NSObject, NSMenuDelegate {
             }
         } else if dot {
             markOutro = false
+            tundukOutro = nil
             animTimer?.invalidate(); animTimer = nil
             frameIdx = 0
             button.image = dotIcon(color: color)
-        } else if markOutro {
+        } else if markOutro || tundukOutro != nil {
             ()
+        } else if animStyle == .tunduk, animTimer != nil, !reduceMotion {
+            // Ease back to the rest pose over a few frames instead of snapping (see animStep).
+            tundukOutro = (from: frameIdx, step: 0)
         } else if animStyle == .mark, animTimer != nil, frameIdx >= markLoopStart {
             markOutro = true
             frameIdx = markBodyCount
@@ -1415,6 +1426,21 @@ final class StatusController: NSObject, NSMenuDelegate {
     }
 
     func animStep() {
+        if var outro = tundukOutro {
+            outro.step += 1
+            if outro.step >= TundukRenderer.outroFrames {
+                tundukOutro = nil
+                animTimer?.invalidate(); animTimer = nil
+                frameIdx = 0
+                statusItem.button?.image = restingIcon(color: activeColor)
+            } else {
+                tundukOutro = outro
+                statusItem.button?.image = flattened(TundukRenderer.image(
+                    color: activeColor, pose: TundukRenderer.outroPose(from: outro.from, step: outro.step)))
+            }
+            applyTitle()
+            return
+        }
         frameIdx += (animStyle == .mark ? markAdvance : 1)
         if markOutro {
             if frameIdx >= markSequence.count - 1 {
@@ -1496,6 +1522,7 @@ final class StatusController: NSObject, NSMenuDelegate {
     }
 
     func buildIconImage(color: NSColor?, frame: Int) -> NSImage {
+        if animStyle == .tunduk { return TundukRenderer.image(color: color, frame: frame) }
         if animStyle == .web { return tint(frames, color: color, frame: frame) }
         if animStyle == .crab { return crabIcon(color: color, frame: frame) }
         if animStyle == .mark { return markIcon(color: color, frame: frame) }
@@ -1560,8 +1587,9 @@ final class StatusController: NSObject, NSMenuDelegate {
         }
     }
 
-    let logoSet: [NSImage] = Data(base64Encoded: claudeLogoPNG).flatMap(NSImage.init(data:)).map { [$0] } ?? []
+    let logoSet: [NSImage] = Data(base64Encoded: restingMarkPNG).flatMap(NSImage.init(data:)).map { [$0] } ?? []
     func restingIcon(color: NSColor?) -> NSImage {
+        if animStyle == .tunduk { return flattened(TundukRenderer.image(color: color)) }
         if animStyle == .crab { return crabIcon(color: color, frame: 0) }
         if animStyle == .mark, let logo = logoSet.first {
             return markLayer(logo, color: color, scale: markSparkScale)

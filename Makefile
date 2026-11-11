@@ -1,4 +1,4 @@
-.PHONY: build dmg test run clean
+.PHONY: build dmg test run clean icons preview-icons
 
 APP := build/Claude Status Bar.app
 
@@ -13,6 +13,17 @@ dmg:
 ## Run the hook/installer tests
 test:
 	node --test tests/*.test.js
+
+## Regenerate the tündük SVGs, native paths, resting mask and app icon
+icons:
+	python3 scripts/generate-tunduk.py
+	swift -module-cache-path build/swift-module-cache scripts/render-mark.swift build
+
+## Render still and animated previews using the app's tündük renderer
+preview-icons:
+	mkdir -p build
+	swiftc -module-cache-path build/swift-module-cache Sources/TundukGeometry.swift Sources/TundukRender.swift scripts/preview-tunduk.swift -o build/preview-tunduk -framework Cocoa
+	build/preview-tunduk assets/tunduk
 
 ## Build, then relaunch the freshly built app
 run: build
