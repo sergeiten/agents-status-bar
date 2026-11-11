@@ -49,7 +49,9 @@ cp hooks/update.js hooks/lifecycle.js hooks/core.js hooks/install.js hooks/unins
 mkdir -p "$APP/Contents/Resources/sources"
 cp hooks/sources/*.js "$APP/Contents/Resources/sources/"
 cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-cp assets/completion.mp3 "$APP/Contents/Resources/completion.mp3"
+# Completion sounds, one per menu choice (see completionSounds in main.swift).
+mkdir -p "$APP/Contents/Resources/sounds"
+cp assets/sounds/*.mp3 "$APP/Contents/Resources/sounds/"
 
 # --- Signing / notarization ---
 # For a clean (no Gatekeeper warning) release you need, set up once on this Mac:

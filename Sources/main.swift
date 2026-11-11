@@ -404,12 +404,27 @@ final class StatusController: NSObject, NSMenuDelegate {
     var sessionWord: [String: String] = [:] // id -> current thinking word; re-picked on each entry into "thinking"
     var soundThreshold: Double = 0  // 0 = off; else the min turn length (seconds) that chimes on completion
     var turnStart: [String: Double] = [:]  // id -> active turn start, for the completion-sound length gate
-    lazy var completionSound: NSSound? = {
-        guard let p = Bundle.main.path(forResource: "completion", ofType: "mp3"),
+    // Selectable completion sounds (Resources/sounds/<id>.mp3). Classic is the original chime and the
+    // default. The volumes even out loudness: each clip is scaled so its RMS level matches Classic
+    // at its long-standing 0.7 (the ElevenLabs clips are mastered much hotter; Komuz is already soft).
+    static let completionSounds: [(id: String, name: String, volume: Float)] = [
+        ("classic", "Classic", 0.7),
+        ("glass", "Glass", 0.19),
+        ("marimba", "Marimba", 0.085),
+        ("komuz", "Komuz", 1.0),
+        ("bowl", "Singing Bowl", 0.11),
+    ]
+    var completionSoundID = "classic"
+    var loadedCompletionSound: (id: String, sound: NSSound)?
+    var completionSound: NSSound? {
+        if let loaded = loadedCompletionSound, loaded.id == completionSoundID { return loaded.sound }
+        guard let entry = Self.completionSounds.first(where: { $0.id == completionSoundID }),
+              let p = Bundle.main.path(forResource: entry.id, ofType: "mp3", inDirectory: "sounds"),
               let s = NSSound(contentsOfFile: p, byReference: true) else { return nil }
-        s.volume = 0.7 // the clip is loud at full system volume; play it a bit softer
+        s.volume = entry.volume
+        loadedCompletionSound = (entry.id, s)
         return s
-    }()
+    }
     // Claude Code's SPINNER_VERBS, minus the hyphenated/tongue-twister ones. Longest kept is ~14 chars
     // ("Hullaballooing"/"Metamorphosing"); with the timer showing they can get wide in a crowded menu bar.
     let thinkingWords = [
@@ -516,6 +531,9 @@ final class StatusController: NSObject, NSMenuDelegate {
         if d.object(forKey: "iconSystem") != nil { iconSystem = d.bool(forKey: "iconSystem") }
         if d.object(forKey: "showLabel") != nil { showLabel = d.bool(forKey: "showLabel") }
         if d.object(forKey: "soundThreshold") != nil { soundThreshold = d.double(forKey: "soundThreshold") }
+        if let id = d.string(forKey: "completionSoundName"), Self.completionSounds.contains(where: { $0.id == id }) {
+            completionSoundID = id
+        }
         if let s = d.string(forKey: "animStyle"), let st = AnimStyle(rawValue: s) { animStyle = st }
         loadMarkConfig()
         let menu = NSMenu()
@@ -786,6 +804,15 @@ final class StatusController: NSObject, NSMenuDelegate {
             it.target = self
             it.representedObject = NSNumber(value: secs)
             it.state = soundThreshold == secs ? .on : .off
+            soundSub.addItem(it)
+        }
+        // Which sound plays. Picking one previews it, so you can audition without finishing a turn.
+        soundSub.addItem(.separator())
+        for entry in Self.completionSounds {
+            let it = NSMenuItem(title: entry.name, action: #selector(chooseCompletionSound(_:)), keyEquivalent: "")
+            it.target = self
+            it.representedObject = entry.id
+            it.state = completionSoundID == entry.id ? .on : .off
             soundSub.addItem(it)
         }
         soundParent.submenu = soundSub
@@ -1095,6 +1122,14 @@ final class StatusController: NSObject, NSMenuDelegate {
         guard let n = sender.representedObject as? NSNumber else { return }
         soundThreshold = n.doubleValue
         UserDefaults.standard.set(soundThreshold, forKey: "soundThreshold")
+    }
+
+    @objc func chooseCompletionSound(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        completionSound?.stop()
+        completionSoundID = id
+        UserDefaults.standard.set(id, forKey: "completionSoundName")
+        completionSound?.play()
     }
 
     @objc func chooseStyle(_ sender: NSMenuItem) {

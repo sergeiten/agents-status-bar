@@ -54,6 +54,7 @@ Everything is controlled from the menu:
   - **Clawd™**, a pixel-art Clawd crab that scuttles while Claude works
   - **Orbit**, three dots that orbit, merge and breathe
 - **Icon color:** **Gold** or **System** (adaptive black/white) for Tündük; **Orange** or **System** for the other styles. Existing animation and color preferences are preserved. Tündük stays still when macOS Reduce Motion is enabled. In System mode Clawd™ renders as a shaded monochrome silhouette that matches the menu bar.
+- **Completion Sound:** chime when a turn finishes: **Off** (default), **Every turn**, or only after turns of **1 / 5 / 15 min+**. Pick the sound underneath: **Classic**, **Glass**, **Marimba**, **Komuz** or **Singing Bowl**; choosing one plays a preview.
 - **Version and update:** the menu shows your current version and tells you when an update is ready (see [Updating](#updating)).
 
 ### Where it works

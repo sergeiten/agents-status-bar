@@ -1,4 +1,4 @@
-.PHONY: build dmg test run clean icons preview-icons
+.PHONY: build dmg test run clean icons preview-icons sound-candidates
 
 APP := build/Claude Status Bar.app
 
@@ -24,6 +24,10 @@ preview-icons:
 	mkdir -p build
 	swiftc -module-cache-path build/swift-module-cache Sources/TundukGeometry.swift Sources/TundukRender.swift scripts/preview-tunduk.swift -o build/preview-tunduk -framework Cocoa
 	build/preview-tunduk assets/tunduk
+
+## Generate completion-sound candidates with ElevenLabs (needs an API key; see the script)
+sound-candidates:
+	python3 scripts/generate-sounds.py
 
 ## Build, then relaunch the freshly built app
 run: build

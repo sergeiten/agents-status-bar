@@ -19,3 +19,7 @@ Claude Status Bar's multi-session support grew out of several community contribu
 - **[@szhu](https://github.com/szhu)**, [homebrew-cask PR #274337](https://github.com/Homebrew/homebrew-cask/pull/274337): submitted Claude Status Bar to Homebrew unprompted, waited out the repo-age rule, and carried the cask through review to merge. `brew install --cask claude-status-bar` exists because of this.
 
 Thanks as well to everyone who opened issues and pull requests along the way.
+
+## Assets
+
+- The Glass, Marimba, Komuz and Singing Bowl completion sounds were generated with the [ElevenLabs](https://elevenlabs.io) sound effects model (`eleven_text_to_sound_v3`); see `scripts/generate-sounds.py`.
