@@ -3,6 +3,14 @@
 All notable changes to Claude Status Bar are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **OpenAI Codex CLI support.** Codex sessions now show in the menu bar next to Claude Code ones, with a `CDX` pill in the dropdown. If `~/.codex` exists, the app adds its hooks to `~/.codex/hooks.json` and leaves your own hooks in place. Codex only runs new hooks after you approve them, so run `/hooks` in Codex once to trust them.
+
+### Changed
+- **Each agent now has its own hook adapter.** The hook scripts are split into a shared core (`hooks/core.js`) and one adapter per agent (`hooks/sources/`), so adding another agent means writing one small file. Hooks installed by older versions keep working.
+
 ## [0.4.5] - 2026-09-18
 
 ### Added

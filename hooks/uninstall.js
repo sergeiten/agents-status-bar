@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Removes the status-bar hooks from every agent config it may have been installed into.
 
 const fs = require("fs");
 const os = require("os");
@@ -12,7 +13,6 @@ const shellQuote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
 const quotedMarkerPrefix = shellQuote(MARKER).slice(0, -1);
 const isOurs = (command) =>
   command.includes(MARKER) || command.includes(quotedMarkerPrefix);
-const settingsPath = path.join(home, ".claude", "settings.json");
 
 // Tear down the desktop watcher LaunchAgent (best-effort; safe if absent).
 const AGENT_LABEL = "com.local.claudestatusbar.watcher";
@@ -21,14 +21,20 @@ try { cp.execSync(`launchctl bootout gui/${process.getuid()}/${AGENT_LABEL}`, { 
 if (fs.existsSync(agentPlist)) { fs.rmSync(agentPlist); console.log("Removed desktop watcher LaunchAgent."); }
 try { cp.execSync("pkill -x ClaudeStatusBar", { stdio: "ignore" }); } catch {}
 
-if (!fs.existsSync(settingsPath)) { console.log("No settings.json; nothing to do."); process.exit(0); }
+const targets = [
+  path.join(home, ".claude", "settings.json"), // Claude Code
+  path.join(home, ".codex", "hooks.json"),     // OpenAI Codex
+];
 
-const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-for (const evt of Object.keys(settings.hooks || {})) {
-  settings.hooks[evt] = (settings.hooks[evt] || [])
-    .map((e) => ({ ...e, hooks: (e.hooks || []).filter((h) => !isOurs(h.command || "")) }))
-    .filter((e) => (e.hooks || []).length > 0);
-  if (settings.hooks[evt].length === 0) delete settings.hooks[evt];
+for (const file of targets) {
+  if (!fs.existsSync(file)) { console.log("No", file + "; nothing to do."); continue; }
+  const settings = JSON.parse(fs.readFileSync(file, "utf8"));
+  for (const evt of Object.keys(settings.hooks || {})) {
+    settings.hooks[evt] = (settings.hooks[evt] || [])
+      .map((e) => ({ ...e, hooks: (e.hooks || []).filter((h) => !isOurs(h.command || "")) }))
+      .filter((e) => (e.hooks || []).length > 0);
+    if (settings.hooks[evt].length === 0) delete settings.hooks[evt];
+  }
+  fs.writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
+  console.log("Removed status-bar hooks from", file);
 }
-fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-console.log("Removed status-bar hooks from", settingsPath);

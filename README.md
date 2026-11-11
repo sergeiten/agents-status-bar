@@ -63,6 +63,7 @@ Everything is controlled from the menu:
 | Claude Code Desktop — **Code** tab | ✅ |
 | Cursor (Claude Code extension) | ✅ |
 | Claude Desktop — **Chat/Cowork** tab | ❌ |
+| OpenAI Codex CLI | ✅ (run `/hooks` in Codex once to trust the hooks) |
 
 **Multi-session support.** When several Claude Code sessions run at once (multiple terminals, or a terminal plus the desktop app), the menu bar surfaces the highest-priority one: a session awaiting your permission is never hidden behind one that's thinking. The dropdown lists every live session. Precise per-tab focus is in progress: **[issue #19 →](https://github.com/m1ckc3s/claude-status-bar/issues/19)**.
 

@@ -314,6 +314,7 @@ final class CopyRowView: NSView {
 
 final class StatusController: NSObject, NSMenuDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    // Source-neutral despite the path: every agent's hooks (Claude Code, Codex, …) write here.
     let stateDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusbar/state.d")
     let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
 
@@ -331,8 +332,20 @@ final class StatusController: NSObject, NSMenuDelegate {
     // most-recent session is always kept visible (floor at one). 0 = Never. Defaults to 30 min.
     var stalePruneAge: TimeInterval { UserDefaults.standard.object(forKey: "hideIdleAfter") as? Double ?? 900 }
 
+    // The agent a session belongs to. Every source's hooks write the same normalized state file
+    // (see hooks/core.js), so this only drives the few per-agent touches: the row pill, the
+    // working label, and how a frozen turn is recovered. Missing = claude (pre-multi-source files).
+    enum Source: String {
+        case claude, codex
+
+        // Claude Code fires no hook on Esc / a denied permission, so the app tails its transcript
+        // for the "interrupted by user" marker. Codex has an Interrupt hook instead.
+        var tailsTranscriptForInterrupt: Bool { self == .claude }
+    }
+
     struct Session {
         var id: String, state: String, label: String, project: String, transcript: String
+        var source: Source      // which agent wrote this file
         var cwd: String         // session working directory; "" on pre-upgrade files
         var entrypoint: String  // CLAUDE_CODE_ENTRYPOINT: "cli", "claude-desktop", …
         var termProgram: String // TERM_PROGRAM for CLI sessions: "Apple_Terminal", "iTerm.app", …
@@ -350,6 +363,7 @@ final class StatusController: NSObject, NSMenuDelegate {
             self.label = o["label"] as? String ?? ""
             self.project = o["project"] as? String ?? ""
             self.transcript = o["transcript"] as? String ?? ""
+            self.source = Source(rawValue: o["source"] as? String ?? "") ?? .claude
             self.cwd = o["cwd"] as? String ?? ""
             self.entrypoint = o["entrypoint"] as? String ?? ""
             self.termProgram = o["term_program"] as? String ?? ""
@@ -877,7 +891,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         let nameMax = Int(cfg["nameMax"] ?? 30)
         let working = (eff == "thinking" || eff == "tool") && s.startedAt > 0
         let resting = !(eff == "permission" || eff == "thinking" || eff == "tool")  // the dim caret
-        let tag = surfaceTag(s.entrypoint)
+        let tag = surfaceTag(s)
         v.configure(icon: sessionSymbol(s, eff: eff),
                     iconTint: resting ? .tertiaryLabelColor : .labelColor,  // caret dim; spinner matches the name font; amber image ignores tint
                     spinning: (eff == "thinking" || eff == "tool"),
@@ -911,11 +925,13 @@ final class StatusController: NSObject, NSMenuDelegate {
         return s.project.isEmpty ? "session" : s.project
     }
 
-    // CLAUDE_CODE_ENTRYPOINT -> a short all-caps badge tag.
-    // Every surface collapses to a 3-letter pill: the desktop app is APP, everything else (cli,
-    // vscode, cursor, windsurf, …) is a terminal/editor context, so CLI. Keeps pills uniform.
-    func surfaceTag(_ entrypoint: String) -> String {
-        switch entrypoint {
+    // Source + CLAUDE_CODE_ENTRYPOINT -> a short all-caps badge tag.
+    // Every surface collapses to a 3-letter pill: Codex is CDX; for Claude the desktop app is APP,
+    // everything else (cli, vscode, cursor, windsurf, …) is a terminal/editor context, so CLI.
+    // Keeps pills uniform.
+    func surfaceTag(_ s: Session) -> String {
+        if s.source == .codex { return "CDX" }
+        switch s.entrypoint {
         case "claude-desktop": return "APP"
         case "":               return ""
         default:               return "CLI"
@@ -998,6 +1014,8 @@ final class StatusController: NSObject, NSMenuDelegate {
     }
 
     func workingLabel(_ s: Session) -> String {
+        // The whimsical verbs are Claude Code's; Codex itself just says "Working".
+        if s.state == "thinking", s.source == .codex { return "Working…" }
         if s.state == "thinking" {
             let w = sessionWord[s.id] ?? thinkingWords.randomElement() ?? ""
             if !w.isEmpty { return w + "…" }
@@ -1276,7 +1294,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         if s.state == "thinking" || s.state == "tool" || s.state == "permission" {
             let cap: Double = s.state == "permission" ? 7200 : 900
             if now - s.ts > cap { return "idle" }
-            if !s.transcript.isEmpty, let last = cachedLastTurnLine(s.transcript),
+            if s.source.tailsTranscriptForInterrupt, !s.transcript.isEmpty, let last = cachedLastTurnLine(s.transcript),
                last.contains("interrupted by user") { return "idle" }
             return s.state
         }
