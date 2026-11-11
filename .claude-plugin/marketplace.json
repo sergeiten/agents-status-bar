@@ -1,15 +1,15 @@
 {
-  "name": "claude-status-bar",
-  "owner": { "name": "Mick Cesanek" },
-  "description": "Menu bar status indicator for Claude Code.",
+  "name": "agents-status-bar",
+  "owner": { "name": "Sergei Ten" },
+  "description": "Menu bar status indicator for AI coding agents.",
   "plugins": [
     {
-      "name": "claude-status-bar",
-      "displayName": "Claude Status Bar",
+      "name": "agents-status-bar",
+      "displayName": "Agents Status Bar",
       "source": "./",
-      "description": "Menu bar indicator for Claude Code: animated spark, elapsed timer, and open/close lifecycle.",
-      "version": "0.4.5",
-      "homepage": "https://github.com/m1ckc3s/claude-status-bar",
+      "description": "Menu bar indicator for AI coding agents (Claude Code, Codex): animated tündük icon, elapsed timer, and open/close lifecycle.",
+      "version": "1.0.0",
+      "homepage": "https://github.com/sergeiten/agents-status-bar",
       "license": "MIT"
     }
   ]

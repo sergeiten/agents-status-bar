@@ -1,9 +1,19 @@
 # Changelog
 
-All notable changes to Claude Status Bar are documented here. This project follows
+All notable changes to Agents Status Bar are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.0.0] - Unreleased
+
+The first release as **Agents Status Bar**, a fork of [Claude Status Bar](https://github.com/m1ckc3s/claude-status-bar) by Mick Cesanek that tracks more than one coding agent.
+
+### Changed
+- **New name and identity.** The app is now Agents Status Bar (`app.vdoske.agentsstatusbar`), keeps its files in `~/.agents-status-bar/`, and checks `sergeiten/agents-status-bar` for updates. It's a separate app: it never touches the original Claude Status Bar, its hooks or its files, so both can be installed side by side.
+- **Gold or System colours.** The Orange colour option is replaced by Gold, and the status words are a new, original set.
+
+### Removed
+- **The Spark, Clawd™ and Orbit animation styles.** They were built on Anthropic's artwork. Tündük (the new default) and Unicode remain.
+- **Homebrew instructions.** There's no `agents-status-bar` cask yet; install from the DMG.
 
 ### Added
 - **OpenAI Codex CLI support.** Codex sessions now show in the menu bar next to Claude Code ones, with a `CDX` pill in the dropdown. If `~/.codex` exists, the app adds its hooks to `~/.codex/hooks.json` and leaves your own hooks in place. Codex only runs new hooks after you approve them, so run `/hooks` in Codex once to trust them.
@@ -11,8 +21,12 @@ All notable changes to Claude Status Bar are documented here. This project follo
 - **Pick your completion sound.** The Completion Sound menu now lists the sounds below the timing options: Classic (the original chime, still the default), Glass, Marimba, Komuz and Singing Bowl. Choosing one plays a preview. The new sounds are generated with ElevenLabs and level-matched to Classic.
 - **A new tündük icon.** The menu bar and app icon are now the tündük crown from the Kyrgyz flag, in gold (or System), gently swaying while agents work.
 
-### Changed
+### Changed (internals)
 - **Each agent now has its own hook adapter.** The hook scripts are split into a shared core (`hooks/core.js`) and one adapter per agent (`hooks/sources/`), so adding another agent means writing one small file. Hooks installed by older versions keep working.
+
+---
+
+*Everything below is the history of [Claude Status Bar](https://github.com/m1ckc3s/claude-status-bar), the project this app is based on.*
 
 ## [0.4.5] - 2026-09-18
 

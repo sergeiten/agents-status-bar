@@ -18,17 +18,17 @@ const runScript = (name, home) => {
 // Fire a hook script the way an agent would: payload on stdin. The quit marker stops the
 // self-heal relaunch from opening the real app during tests.
 const fire = (home, script, args, payload, env = {}) => {
-  fs.mkdirSync(path.join(home, ".claude", "statusbar"), { recursive: true });
-  fs.writeFileSync(path.join(home, ".claude", "statusbar", "quit-intent"), "");
+  fs.mkdirSync(path.join(home, ".agents-status-bar"), { recursive: true });
+  fs.writeFileSync(path.join(home, ".agents-status-bar", "quit-intent"), "");
   execFileSync(process.execPath, [path.join(hooksDir, script), ...args], {
-    env: { ...process.env, HOME: home, ...env },
+    env: { ...process.env, HOME: home, AGENTS_STATUSBAR_NO_LAUNCH: "1", ...env },
     input: JSON.stringify(payload),
     stdio: "pipe",
   });
 };
 
 const readState = (home, id) =>
-  JSON.parse(fs.readFileSync(path.join(home, ".claude", "statusbar", "state.d", id + ".json"), "utf8"));
+  JSON.parse(fs.readFileSync(path.join(home, ".agents-status-bar", "state.d", id + ".json"), "utf8"));
 
 const tmpHome = (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "statusbar sources test-"));
@@ -64,7 +64,7 @@ test("codex install appends after user hooks, is idempotent, and uninstalls clea
   assert.ok(Object.values(cfg.hooks).flat().every((g) => g.matcher === undefined));
   // Scripts for every source are copied next to the entry points.
   for (const f of ["core.js", "sources/claude.js", "sources/codex.js"]) {
-    assert.ok(fs.existsSync(path.join(home, ".claude", "statusbar", f)), f);
+    assert.ok(fs.existsSync(path.join(home, ".agents-status-bar", f)), f);
   }
 
   runScript("install.js", home);
@@ -73,7 +73,7 @@ test("codex install appends after user hooks, is idempotent, and uninstalls clea
   runScript("uninstall.js", home);
   assert.deepEqual(JSON.parse(fs.readFileSync(codexHooks, "utf8")), { hooks: { SessionStart: [userGroup] } });
   const claude = JSON.parse(fs.readFileSync(path.join(home, ".claude", "settings.json"), "utf8"));
-  assert.equal(commands(claude).filter((c) => c.includes(".claude/statusbar")).length, 0);
+  assert.equal(commands(claude).filter((c) => c.includes(".agents-status-bar")).length, 0);
 });
 
 test("claude events write source=claude state (default, no flag)", (t) => {
@@ -130,17 +130,17 @@ test("codex events map to the normalized states", (t) => {
   assert.ok(s.pid > 0);
 
   fire(home, "lifecycle.js", ["end", "--source=codex"], { session_id: "x1" }, env);
-  assert.equal(fs.existsSync(path.join(home, ".claude", "statusbar", "state.d", "x1.json")), false);
+  assert.equal(fs.existsSync(path.join(home, ".agents-status-bar", "state.d", "x1.json")), false);
 });
 
 test("codex pid resolution skips a wrapping shell", (t) => {
   const home = tmpHome(t);
   const script = path.join(hooksDir, "update.js");
-  fs.mkdirSync(path.join(home, ".claude", "statusbar"), { recursive: true });
-  fs.writeFileSync(path.join(home, ".claude", "statusbar", "quit-intent"), "");
+  fs.mkdirSync(path.join(home, ".agents-status-bar"), { recursive: true });
+  fs.writeFileSync(path.join(home, ".agents-status-bar", "quit-intent"), "");
   // `sh -c "...; true"` keeps sh alive as node's parent (no exec optimization), like a wrapper.
   execFileSync("/bin/sh", ["-c", `"${process.execPath}" "${script}" pre --source=codex; true`], {
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, AGENTS_STATUSBAR_NO_LAUNCH: "1" },
     input: JSON.stringify({ session_id: "x2", tool_name: "Bash" }),
     stdio: "pipe",
   });

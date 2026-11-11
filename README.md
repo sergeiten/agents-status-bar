@@ -1,113 +1,93 @@
+# Agents Status Bar
 
+A tiny macOS menu bar app that shows the **live status of your AI coding agents** (Claude Code and OpenAI Codex): an animated icon while an agent is thinking or running a tool, a yellow dot when one is waiting for your permission, and the elapsed time of the current turn. It's lightweight, with no window, no Dock icon and no usage dashboards.
 
-A tiny macOS menu bar app that shows **Claude Code's live status**: an animated Claude icon while it's thinking or running a tool, a yellow dot when it's awaiting your permission, and the elapsed time of the current turn. Lightweight, no window, no dock icon, no usage dashboards.
-
-Built so you can tab away during a long "thinking" stretch and still see, at a glance, whether Claude is working, waiting on you, or done.
-
-<img width="480" height="383" alt="Screen Recording 2026-07-10 at 12 32 23 AM" src="https://github.com/user-attachments/assets/f5d77b7c-f41d-4276-b28f-e1cf655fd323" />
+Built so you can tab away during a long "thinking" stretch and still see, at a glance, whether your agents are working, waiting on you, or done.
 
 ## Install
 
-### Homebrew (recommended)
-
-```bash
-brew install --cask claude-status-bar && open -a "Claude Status Bar"
-```
-
-The one launch at the end matters: it wires up the Claude Code hooks automatically. After that it starts itself whenever Claude Code runs.
-
-**Already using the app from the DMG?** The same command switches you to Homebrew. Your settings and hooks carry over, and the old copy cleans itself up on first launch. Full details, edge cases, and the tested upgrade matrix: **[HOMEBREW.md](HOMEBREW.md)**.
+1. Download the latest `AgentsStatusBar.dmg` from [Releases](https://github.com/sergeiten/agents-status-bar/releases).
+2. Open it and drag **Agents Status Bar** into Applications.
+3. Launch it once. On first launch it sets up the hooks for Claude Code and, if it's installed, Codex.
+4. Start a new agent session. The icon appears whenever an agent is running.
 
 > [!IMPORTANT]
-> **Updated (or installed) mid-session?** Sessions already open appear the next time they do something (a prompt or a tool call). Starting a new `claude` session also works.
+> **Codex:** Codex only runs new hooks after you trust them. Run `/hooks` in Codex once after installing.
+>
+> **Installed mid-session?** Sessions already open appear the next time they do something (a prompt or a tool call). Starting a new session also works.
 
-### DMG
-
-*Signed and notarized by Apple*
-
-1. Download the latest `ClaudeStatusBar.dmg` from [Releases](../../releases).
-2. Open it and drag **Claude Status Bar** into Applications.
-3. Launch it once. On first launch it wires up the Claude Code hooks for you automatically.
-4. Start a new Claude Code session, the icon appears whenever Claude Code is running.
+To build from source instead, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Updating
 
-The menu tells you when an update is ready. Installed via brew, it shows **Update via brew** with a copy button (paste the command in your terminal); it appears once Homebrew can actually deliver the new version, which can lag a release by up to a day. Installed via DMG, **Update available** opens the releases page, plus a one-click **Switch to Homebrew** option.
-
-Or just run `brew upgrade --cask claude-status-bar` (brew), or download the latest DMG and drag it into Applications (manual). Hooks refresh themselves on the next launch; nothing to run by hand. **Upgrading from 0.3.x via DMG? Launch the app once after dragging**, that's what retires the old-named copy ([details](HOMEBREW.md#faq--troubleshooting)).
+The app checks once a day and the menu shows **Update available** when a new release is out; clicking it opens the releases page. Download the new DMG and drag it into Applications. The hooks refresh themselves on the next launch.
 
 ## What it shows
 
-- **Thinking / working** — the icon animates, with a live `1m 1s` timer.
-- **Running a tool** — a short label (`Editing`, `Reading`, `Running command`, `Using tool`, …).
-- **Awaiting permission** — a paused yellow dot, in both the CLI and the Desktop app.
-- **Idle / done** — rests on the tündük mark (Clawd™ keeps its crab).
+- **Thinking / working:** the icon animates, with a live `1m 1s` timer.
+- **Running a tool:** a short label (`Editing`, `Reading`, `Running command`, `Using tool`, …).
+- **Awaiting permission:** a paused yellow dot.
+- **Idle / done:** the icon rests on the tündük mark.
 
 Everything is controlled from the menu:
 
 - **Show timer:** toggle the elapsed `1m 1s` clock.
-- **Show text:** show the status label next to the icon (`Manifesting…`, `Percolating…`, `Editing`, `Running command`), or turn it off for an icon-only menu bar (on by default).
-- **Animation style:**
-  - **Tündük** (default), the Kyrgyz tündük crown, gently swaying while agents work
-  - **Spark**, the web/chat "morph" spark
-  - **Unicode**, the terminal glyph spinner
-  - **Clawd™**, a pixel-art Clawd crab that scuttles while Claude works
-  - **Orbit**, three dots that orbit, merge and breathe
-- **Icon color:** **Gold** or **System** (adaptive black/white) for Tündük; **Orange** or **System** for the other styles. Existing animation and color preferences are preserved. Tündük stays still when macOS Reduce Motion is enabled. In System mode Clawd™ renders as a shaded monochrome silhouette that matches the menu bar.
-- **Completion Sound:** chime when a turn finishes: **Off** (default), **Every turn**, or only after turns of **1 / 5 / 15 min+**. Pick the sound underneath: **Classic**, **Glass**, **Marimba**, **Komuz** or **Singing Bowl**; choosing one plays a preview.
-- **Version and update:** the menu shows your current version and tells you when an update is ready (see [Updating](#updating)).
+- **Show text:** show the status label next to the icon (`Pondering…`, `Weaving…`, `Editing`, `Running command`), or turn it off for an icon-only menu bar (on by default).
+- **Animation:**
+  - **Tündük** (default): the tündük crown from the Kyrgyz flag, gently swaying while agents work. It stays still when macOS Reduce Motion is on.
+  - **Unicode:** a glyph spinner.
+- **Color:** **Gold** or **System** (adaptive black/white).
+- **Completion Sound:** a chime when a turn finishes: **Off** (default), **Every turn**, or only after turns of **1 / 5 / 15 min+**. Pick the sound underneath: **Classic**, **Glass**, **Marimba**, **Komuz** or **Singing Bowl**. Choosing one plays a preview.
+- **Version and update:** the menu shows your current version and tells you when an update is ready.
 
 ### Where it works
 
 | Surface | Tracked? |
 |---|---|
 | Claude Code CLI (terminal) | ✅ |
-| Claude Code Desktop — **Code** tab | ✅ |
+| Claude Code Desktop, **Code** tab | ✅ |
 | Cursor (Claude Code extension) | ✅ |
-| Claude Desktop — **Chat/Cowork** tab | ❌ |
+| Claude Desktop, **Chat/Cowork** tab | ❌ |
 | OpenAI Codex CLI | ✅ (run `/hooks` in Codex once to trust the hooks) |
 
-**Multi-session support.** When several Claude Code sessions run at once (multiple terminals, or a terminal plus the desktop app), the menu bar surfaces the highest-priority one: a session awaiting your permission is never hidden behind one that's thinking. The dropdown lists every live session. Precise per-tab focus is in progress: **[issue #19 →](https://github.com/m1ckc3s/claude-status-bar/issues/19)**.
+**Multi-session support.** When several sessions run at once (multiple terminals, a terminal plus the desktop app, or Claude Code next to Codex), the menu bar shows the highest-priority one: a session waiting for your permission is never hidden behind one that's thinking. The dropdown lists every live session, with a pill for its surface (`CLI`, `APP`, `CDX`).
 
 ## How it works
 
 > [!NOTE]
-> You don't open this app; it opens itself when a Claude Code session starts, and quits when none is running. The only manual launch is the very first one after install, to set up the hooks. Opened by hand with no session active, it quits again after a few seconds. That's normal.
+> You don't open this app; it opens itself when an agent session starts, and quits when none is running. The only manual launch is the very first one after install, to set up the hooks. Opened by hand with no session active, it quits again after a few seconds. That's normal.
 
-The app is stateless. Claude Code fires hooks as it works; the app polls those updates and aggregates them across every live session into a single icon, a permission dot if one needs you, animating if any session is working, resting when all are idle. It launches itself when Claude Code opens and quits when nothing's running, so there's nothing to manage.
+Each agent fires hooks as it works. A small adapter per agent (`hooks/sources/`) turns those events into one session file in `~/.agents-status-bar/state.d/`, and the app aggregates every live session into a single icon: a permission dot if one needs you, animating if any session is working, resting when all are idle.
 
-The installer merges its hooks into `~/.claude/settings.json` (backing it up first), and the app's only network activity is a once-a-day update check against GitHub's and Homebrew's public APIs ([details](PRIVACY.md)).
+The installer merges its hooks into `~/.claude/settings.json` and, when Codex is installed, `~/.codex/hooks.json` (backing each up first). It never touches hooks it didn't add. The app's only network activity is a once-a-day update check against GitHub's public API ([details](PRIVACY.md)).
 
 ## Requirements
 
-- macOS 12+, [Claude Code](https://claude.com/claude-code) (CLI or the Desktop app), Node.js
+- macOS 12+
+- [Claude Code](https://claude.com/claude-code) (CLI or the Desktop app) and/or the [Codex CLI](https://github.com/openai/codex)
+- Node.js
 
 ## Troubleshooting
 
-See [Troubleshooting](TROUBLESHOOTING.md)
+See [Troubleshooting](TROUBLESHOOTING.md).
 
 ## Uninstall
 
 ```bash
-node "/Applications/Claude Status Bar.app/Contents/Resources/uninstall.js"   # removes only our hooks
-brew uninstall --zap claude-status-bar                                       # removes the app + every file it created
+node "/Applications/Agents Status Bar.app/Contents/Resources/uninstall.js"   # removes only our hooks
+rm -rf ~/.agents-status-bar                                                  # removes the app's data
 ```
 
-Installed manually instead of via brew? Skip the second line and drag the app to the Trash.
+Then drag the app to the Trash.
 
-## Acknowledgements
+## Based on Claude Status Bar
 
-I built this for myself, then open-sourced it because other people might find it handy too, and I'm genuinely thrilled that so many of you do. An extra thank-you to everyone who went the extra mile and contributed code, fixes, and ideas.
+Agents Status Bar is a fork of [Claude Status Bar](https://github.com/m1ckc3s/claude-status-bar) by Mick Cesanek, used under the MIT License. Thank you to Mick and to everyone who contributed to the original project; see [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
 
-**[See the contributors →](ACKNOWLEDGEMENTS.md)**
+## Trademarks / Not affiliated
 
-## Trademark / Not Affiliated
-
-This is an unofficial, open-source side project. **It is not affiliated with, endorsed by, or sponsored by Anthropic.** "Claude" and the Claude spark logo are trademarks of Anthropic, used here nominatively. This project is MIT licensed, but that covers the source code only and conveys no rights to Anthropic's trademarks or brand.
-
-If I'm violating or impeding your trademark, Contact me on X ([@mickces](https://x.com/mickces))
-This is a free side project; I'm not monetizing it.
+This is an unofficial, open-source project. **It is not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI, or the author of Claude Status Bar.** "Claude" and "Claude Code" are trademarks of Anthropic, and "Codex" and "OpenAI" are trademarks of OpenAI. They're used here only to describe which tools the app works with. The MIT License covers this project's source code and conveys no rights to anyone's trademarks.
 
 ## License
 
-MIT 
+[MIT](LICENSE)

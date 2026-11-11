@@ -314,14 +314,13 @@ final class CopyRowView: NSView {
 
 final class StatusController: NSObject, NSMenuDelegate {
     let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    // Source-neutral despite the path: every agent's hooks (Claude Code, Codex, …) write here.
-    let stateDir = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusbar/state.d")
+    // Every agent's hooks (Claude Code, Codex, …) write their session files here.
+    let stateDir = (NSHomeDirectory() as NSString).appendingPathComponent(".agents-status-bar/state.d")
     let claudeDesktopBundleID = "com.anthropic.claudefordesktop"
 
     var pollTimer: Timer?
     var animTimer: Timer?
     var frameIdx = 0
-    var markOutro = false
     // Tündük stop transition: the frame the animation stopped on, and how far into the outro we are.
     var tundukOutro: (from: Int, step: Int)? = nil
 
@@ -391,12 +390,9 @@ final class StatusController: NSObject, NSMenuDelegate {
     var turnLineCache: [String: (mtime: Date?, line: String?)] = [:]
     var desktopRunning = false
 
-    let brand = NSColor(srgbRed: 0.851, green: 0.467, blue: 0.341, alpha: 1) // #d97757, Anthropic's official "Orange" accent
     let amber = NSColor(srgbRed: 0.95, green: 0.73, blue: 0.18, alpha: 1) // "awaiting permission" yellow dot
-    let frames: [NSImage] = StatusController.loadFrames()
-    let spriteFPS: Double = 9 // tune: 8 frames per loop -> ~0.9s/cycle
 
-    enum AnimStyle: String { case web, code, crab, mark, tunduk }
+    enum AnimStyle: String { case code, tunduk }
     var animStyle: AnimStyle = .tunduk
     var showTimer = false
     var iconSystem = false // false = style's colors; true = adaptive black/white (template image)
@@ -425,104 +421,32 @@ final class StatusController: NSObject, NSMenuDelegate {
         loadedCompletionSound = (entry.id, s)
         return s
     }
-    // Claude Code's SPINNER_VERBS, minus the hyphenated/tongue-twister ones. Longest kept is ~14 chars
-    // ("Hullaballooing"/"Metamorphosing"); with the timer showing they can get wide in a crowded menu bar.
+    // Rotating status words shown while an agent thinks (re-picked on each entry into "thinking").
     let thinkingWords = [
-        "Accomplishing", "Actioning", "Actualizing", "Architecting", "Baking", "Beaming", "Beboppin'",
-        "Befuddling", "Billowing", "Blanching", "Bloviating", "Boogieing", "Boondoggling", "Booping",
-        "Bootstrapping", "Brewing", "Bunning", "Burrowing", "Calculating", "Canoodling", "Caramelizing",
-        "Cascading", "Catapulting", "Cerebrating", "Channeling", "Channelling", "Churning", "Clauding",
-        "Coalescing", "Cogitating", "Combobulating", "Composing", "Computing", "Concocting", "Considering",
-        "Contemplating", "Cooking", "Crafting", "Creating", "Crunching", "Crystallizing", "Cultivating",
-        "Deciphering", "Deliberating", "Determining", "Doing", "Doodling", "Drizzling", "Ebbing",
-        "Effecting", "Elucidating", "Embellishing", "Enchanting", "Envisioning", "Evaporating", "Fermenting",
-        "Finagling", "Flambéing", "Flowing", "Flummoxing", "Fluttering", "Forging", "Forming", "Frolicking",
-        "Gallivanting", "Galloping", "Garnishing", "Generating", "Gesticulating", "Germinating", "Gitifying",
-        "Grooving", "Gusting", "Harmonizing", "Hashing", "Hatching", "Herding", "Honking", "Hullaballooing",
-        "Hyperspacing", "Ideating", "Imagining", "Improvising", "Incubating", "Inferring", "Infusing",
-        "Ionizing", "Jitterbugging", "Julienning", "Kneading", "Leavening", "Levitating", "Lollygagging",
-        "Manifesting", "Marinating", "Meandering", "Metamorphosing", "Misting", "Moonwalking", "Moseying",
-        "Mulling", "Mustering", "Musing", "Nebulizing", "Nesting", "Noodling", "Nucleating", "Orbiting",
-        "Orchestrating", "Osmosing", "Perambulating", "Percolating", "Perusing", "Pollinating", "Pondering",
-        "Pontificating", "Pouncing", "Precipitating", "Processing", "Proofing", "Propagating", "Puttering",
-        "Puzzling", "Quantumizing", "Razzmatazzing", "Reticulating", "Roosting", "Ruminating", "Sautéing",
-        "Scampering", "Schlepping", "Scurrying", "Seasoning", "Shenaniganing", "Shimmying", "Simmering",
-        "Skedaddling", "Sketching", "Slithering", "Smooshing", "Spelunking", "Spinning", "Sprouting",
-        "Stewing", "Sublimating", "Swirling", "Swooping", "Symbioting", "Synthesizing", "Tempering",
-        "Thinking", "Thundering", "Tinkering", "Tomfoolering", "Transfiguring", "Transmuting", "Twisting",
-        "Undulating", "Unfurling", "Unravelling", "Vibing", "Waddling", "Wandering", "Warping",
-        "Whirlpooling", "Whirring", "Whisking", "Wibbling", "Working", "Wrangling", "Zesting", "Zigzagging"]
-    var iconColor: NSColor? { iconSystem ? nil : brand } // nil => render as an adaptive template
+        "Thinking", "Working", "Pondering", "Musing", "Reasoning", "Exploring", "Planning",
+        "Sketching", "Drafting", "Shaping", "Weaving", "Stitching", "Threading", "Tinkering",
+        "Assembling", "Building", "Tuning", "Refining", "Polishing", "Untangling", "Sorting",
+        "Piecing", "Tracing", "Charting", "Mapping", "Gathering", "Steering", "Roaming"]
+    var iconColor: NSColor? { iconSystem ? nil : TundukRenderer.gold } // nil => render as an adaptive template
     let codeGlyphs = ["✻", "✽", "✶", "✳", "✢"]
     let codePeaks: [CGFloat] = [1.0, 1.0, 1.0, 1.0, 1.0]
     let codeDip: CGFloat = 0.14 // glyph shrinks to this at each swap
     let codeSub = 18            // sub-frames per glyph (tween smoothness)
     let codeCycle: Double = 3.8 // seconds for the full loop (lower = faster)
     lazy var codeGlyphMasks: [NSImage] = codeGlyphs.map { StatusController.glyphMask($0) }
-    let crabFPS: Double = 12.5 // matches the source GIF's 0.08s frame delay
-    lazy var crabFrames: [NSImage] = StatusController.decodePNGs(clawdCrabFramePNGs)
-    // Template frames: bright pixels (white eyes) become transparent holes so they're
-    // visible as negative space against the menu bar in System color mode.
-    lazy var crabTemplateFrames: [NSImage] = crabFrames.map { adaptiveCrabFrame($0) }
-
-    var markFPS: Double = 15
-    var markAdvance: Int { max(1, Int((30.0 / max(1, markFPS)).rounded())) }
-    let markOrbitReps = 2
-    let markBreatheReps = 4
-    let markFadeFrames = 4
-    var markDotScale: CGFloat = 1.08
-    var markSparkScale: CGFloat = 0.92
-    func loadMarkConfig() {
-        let cfg = uiConfig()
-        markFPS = cfg["markFPS"] ?? 15
-        markDotScale = CGFloat(cfg["markDotScale"] ?? 1.08)
-        markSparkScale = CGFloat(cfg["markSparkScale"] ?? 0.92)
-    }
-
-    lazy var markFrames: [String: [NSImage]] = {
-        var out: [String: [NSImage]] = [:]
-        for s in workingMarkStrips {
-            guard let data = Data(base64Encoded: s.data), let img = NSImage(data: data),
-                  let cg = img.cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
-            out[s.name] = (0..<s.frames).compactMap { i in
-                cg.cropping(to: CGRect(x: 0, y: i * 48, width: 48, height: 48))
-                    .map { NSImage(cgImage: $0, size: NSSize(width: 48, height: 48)) }
-            }
-        }
-        return out
-    }()
-
-    lazy var markSequence: [(strip: String, frame: Int)] = {
-        func n(_ name: String) -> Int { workingMarkStrips.first { $0.name == name }?.frames ?? 0 }
-        var seq: [(strip: String, frame: Int)] = []
-        for i in 0..<n("en110") { seq.append((strip: "en110", frame: i)) }
-        for _ in 0..<markOrbitReps { for i in 0..<n("loop110") { seq.append((strip: "loop110", frame: i)) } }
-        for _ in 0..<markBreatheReps { for i in 0..<n("loop40") { seq.append((strip: "loop40", frame: i)) } }
-        for i in 0..<n("ex40") { seq.append((strip: "ex40", frame: i)) }
-        return seq
-    }()
-    var markLoopStart: Int { workingMarkStrips.first { $0.name == "en110" }?.frames ?? 0 }
-    var markBodyCount: Int { markSequence.count - (workingMarkStrips.first { $0.name == "ex40" }?.frames ?? 0) }
 
     var fps: Double {
         switch animStyle {
-        case .web: return spriteFPS
         case .code: return Double(codeGlyphs.count * codeSub) / codeCycle
-        case .crab: return crabFPS
-        case .mark: return markFPS
         case .tunduk: return TundukRenderer.framesPerSecond
         }
     }
     var frameCount: Int {
         switch animStyle {
-        case .web: return max(1, frames.count)
         case .code: return codeGlyphs.count * codeSub
-        case .crab: return max(1, crabFrames.count)
-        case .mark: return max(1, markBodyCount)
         case .tunduk: return TundukRenderer.frameCount
         }
     }
-    var loopStart: Int { animStyle == .mark ? markLoopStart : 0 }
 
     override init() {
         super.init()
@@ -535,7 +459,6 @@ final class StatusController: NSObject, NSMenuDelegate {
             completionSoundID = id
         }
         if let s = d.string(forKey: "animStyle"), let st = AnimStyle(rawValue: s) { animStyle = st }
-        loadMarkConfig()
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
@@ -545,26 +468,9 @@ final class StatusController: NSObject, NSMenuDelegate {
         pollTimer = t
         tick()
         observeDesktopApp()
-        try? FileManager.default.removeItem(atPath: (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusbar/quit-intent"))
-        removeOldNamedBundle()
+        try? FileManager.default.removeItem(atPath: (NSHomeDirectory() as NSString).appendingPathComponent(".agents-status-bar/quit-intent"))
         ensureHooksInstalled()
         checkForUpdate()
-    }
-
-    // 0.4.0 rename transition ("ClaudeStatusBar.app" to "Claude Status Bar.app"): Finder won't
-    // replace across different filenames, so a manual DMG update leaves the old-named copy behind;
-    // remove it on launch. Guarded by bundle id so a fork or unrelated app at that path is never
-    // touched, and skipped when running FROM that path (old-named dev builds).
-    func removeOldNamedBundle() {
-        let old = "/Applications/ClaudeStatusBar.app"
-        guard Bundle.main.bundlePath != old,
-              let info = NSDictionary(contentsOfFile: old + "/Contents/Info.plist"),
-              info["CFBundleIdentifier"] as? String == "com.local.claudestatusbar" else { return }
-        for app in NSWorkspace.shared.runningApplications
-            where app.bundleURL?.path == old && app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            app.forceTerminate()
-        }
-        try? FileManager.default.removeItem(atPath: old)
     }
 
     // Re-runs on first install AND on every version change, so upgrades pick up hook
@@ -576,7 +482,7 @@ final class StatusController: NSObject, NSMenuDelegate {
               let installer = Bundle.main.path(forResource: "install", ofType: "js") else { return }
         DispatchQueue.global().async {
             guard let node = Self.locateNode() else {
-                NSLog("ClaudeStatusBar: could not find node; hooks not installed (will retry next launch)")
+                NSLog("AgentsStatusBar: could not find node; hooks not installed (will retry next launch)")
                 return
             }
             let task = Process()
@@ -626,19 +532,19 @@ final class StatusController: NSObject, NSMenuDelegate {
     // MARK: update check
 
     var currentVersion: String { (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0" }
-    let releaseAPIURL = "https://api.github.com/repos/m1ckc3s/claude-status-bar/releases/latest"
-    let releasePageURL = "https://github.com/m1ckc3s/claude-status-bar/releases/latest"
+    let releaseAPIURL = "https://api.github.com/repos/sergeiten/agents-status-bar/releases/latest"
+    let releasePageURL = "https://github.com/sergeiten/agents-status-bar/releases/latest"
     // Homebrew: the cask lags a GitHub release by up to ~a day (autobump), so brew-managed
     // installs gate "update available" on the CASK version, so the copy command always works
     // when offered. Public JSON, nothing sent anywhere (same privacy story as the GitHub check).
-    let brewCaskAPIURL = "https://formulae.brew.sh/api/cask/claude-status-bar.json"
-    let brewUpgradeCommand = "brew upgrade --cask claude-status-bar"
+    let brewCaskAPIURL = "https://formulae.brew.sh/api/cask/agents-status-bar.json"
+    let brewUpgradeCommand = "brew upgrade --cask agents-status-bar"
     // The trailing `open` matters: brew only copies the app, and the first launch of the new copy
-    // is what installs hooks and removes the old-named bundle (0.4.0 rename transition).
-    let brewInstallCommand = "brew install --cask claude-status-bar && open -a \"Claude Status Bar\""
+    // is what installs the hooks.
+    let brewInstallCommand = "brew install --cask agents-status-bar && open -a \"Agents Status Bar\""
     var brewManaged: Bool {
-        FileManager.default.fileExists(atPath: "/opt/homebrew/Caskroom/claude-status-bar")
-            || FileManager.default.fileExists(atPath: "/usr/local/Caskroom/claude-status-bar")
+        FileManager.default.fileExists(atPath: "/opt/homebrew/Caskroom/agents-status-bar")
+            || FileManager.default.fileExists(atPath: "/usr/local/Caskroom/agents-status-bar")
     }
 
     // Once/day: cache GitHub's latest release tag in UserDefaults. Nothing sent to us.
@@ -648,7 +554,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         if now - d.double(forKey: "lastUpdateCheck") < 86400 { return }
         guard let url = URL(string: releaseAPIURL) else { return }
         var req = URLRequest(url: url)
-        req.setValue("ClaudeStatusBar", forHTTPHeaderField: "User-Agent") // GitHub API requires a UA
+        req.setValue("AgentsStatusBar", forHTTPHeaderField: "User-Agent") // GitHub API requires a UA
         URLSession.shared.dataTask(with: req) { data, _, _ in
             guard let data = data,
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -657,7 +563,8 @@ final class StatusController: NSObject, NSMenuDelegate {
             UserDefaults.standard.set(ver, forKey: "latestVersion")
             UserDefaults.standard.set(now, forKey: "lastUpdateCheck")
         }.resume()
-        guard let brewURL = URL(string: brewCaskAPIURL) else { return }
+        // Only brew-managed installs need the cask version (no cask exists until one is published).
+        guard brewManaged, let brewURL = URL(string: brewCaskAPIURL) else { return }
         URLSession.shared.dataTask(with: URLRequest(url: brewURL)) { data, _, _ in
             guard let data = data,
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -775,7 +682,7 @@ final class StatusController: NSObject, NSMenuDelegate {
 
         let animParent = NSMenuItem(title: "Animation", action: nil, keyEquivalent: "")
         let animSub = NSMenu()
-        for (style, name) in [(AnimStyle.tunduk, "Tündük"), (AnimStyle.web, "Spark"), (AnimStyle.code, "Unicode"), (AnimStyle.crab, "Clawd™"), (AnimStyle.mark, "Orbit")] {
+        for (style, name) in [(AnimStyle.tunduk, "Tündük"), (AnimStyle.code, "Unicode")] {
             let it = NSMenuItem(title: name, action: #selector(chooseStyle(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = style.rawValue
@@ -787,7 +694,7 @@ final class StatusController: NSObject, NSMenuDelegate {
 
         let colorParent = NSMenuItem(title: "Color", action: nil, keyEquivalent: "")
         let colorSub = NSMenu()
-        for (sys, name) in [(false, animStyle == .tunduk ? "Gold" : "Orange"), (true, "System")] {
+        for (sys, name) in [(false, "Gold"), (true, "System")] {
             let it = NSMenuItem(title: name, action: #selector(chooseColor(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = sys
@@ -905,10 +812,10 @@ final class StatusController: NSObject, NSMenuDelegate {
         return line
     }
 
-    // Live layout knobs read fresh from ~/.claude/statusbar/uiconfig.json each render, so numeric
+    // Live layout knobs read fresh from ~/.agents-status-bar/uiconfig.json each render, so numeric
     // tweaks (timer column, pill offset, gap) take effect on the next menu open with NO rebuild.
     func uiConfig() -> [String: Double] {
-        let p = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusbar/uiconfig.json")
+        let p = (NSHomeDirectory() as NSString).appendingPathComponent(".agents-status-bar/uiconfig.json")
         guard let d = FileManager.default.contents(atPath: p),
               let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
         return j.compactMapValues { ($0 as? NSNumber)?.doubleValue }
@@ -1074,7 +981,7 @@ final class StatusController: NSObject, NSMenuDelegate {
     // The marker keeps update.js's self-relaunch from undoing an explicit Quit; cleared on the
     // next SessionStart (lifecycle.js) or the next manual launch (below), whichever comes first.
     @objc func quit() {
-        let marker = (NSHomeDirectory() as NSString).appendingPathComponent(".claude/statusbar/quit-intent")
+        let marker = (NSHomeDirectory() as NSString).appendingPathComponent(".agents-status-bar/quit-intent")
         FileManager.default.createFile(atPath: marker, contents: nil)
         NSApp.terminate(nil)
     }
@@ -1137,9 +1044,7 @@ final class StatusController: NSObject, NSMenuDelegate {
         animStyle = st
         UserDefaults.standard.set(raw, forKey: "animStyle")
         iconCache.removeAll()
-        loadMarkConfig()
         animTimer?.invalidate(); animTimer = nil // recreate at the new style's fps
-        markOutro = false
         tundukOutro = nil
         frameIdx = 0
         evaluate()
@@ -1430,7 +1335,6 @@ final class StatusController: NSObject, NSMenuDelegate {
 
         let reduceMotion = animStyle == .tunduk && NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if animate && !reduceMotion {
-            markOutro = false
             tundukOutro = nil   // resumed mid-outro: keep spinning from the current frame
             if animTimer == nil {
                 let t = Timer(timeInterval: 1.0 / fps, repeats: true) { [weak self] _ in self?.animStep() }
@@ -1438,19 +1342,15 @@ final class StatusController: NSObject, NSMenuDelegate {
                 animTimer = t
             }
         } else if dot {
-            markOutro = false
             tundukOutro = nil
             animTimer?.invalidate(); animTimer = nil
             frameIdx = 0
             button.image = dotIcon(color: color)
-        } else if markOutro || tundukOutro != nil {
+        } else if tundukOutro != nil {
             ()
         } else if animStyle == .tunduk, animTimer != nil, !reduceMotion {
             // Ease back to the rest pose over a few frames instead of snapping (see animStep).
             tundukOutro = (from: frameIdx, step: 0)
-        } else if animStyle == .mark, animTimer != nil, frameIdx >= markLoopStart {
-            markOutro = true
-            frameIdx = markBodyCount
         } else {
             animTimer?.invalidate(); animTimer = nil
             frameIdx = 0
@@ -1476,20 +1376,7 @@ final class StatusController: NSObject, NSMenuDelegate {
             applyTitle()
             return
         }
-        frameIdx += (animStyle == .mark ? markAdvance : 1)
-        if markOutro {
-            if frameIdx >= markSequence.count - 1 {
-                markOutro = false
-                animTimer?.invalidate(); animTimer = nil
-                frameIdx = 0
-                statusItem.button?.image = restingIcon(color: activeColor)
-                applyTitle()
-                return
-            }
-        } else if frameIdx >= frameCount {
-            let body = max(1, frameCount - loopStart)
-            frameIdx = loopStart + (frameIdx - loopStart) % body
-        }
+        frameIdx = (frameIdx + 1) % max(1, frameCount)
         statusItem.button?.image = iconImage(color: activeColor, frame: frameIdx)
         applyTitle() // refresh the elapsed clock
     }
@@ -1524,11 +1411,6 @@ final class StatusController: NSObject, NSMenuDelegate {
 
     // MARK: icon
 
-    static func loadFrames() -> [NSImage] { decodePNGs(claudeSparkFramePNGs) }
-    static func decodePNGs(_ list: [String]) -> [NSImage] {
-        list.compactMap { Data(base64Encoded: $0).flatMap(NSImage.init(data:)) }
-    }
-
     func iconImage(color: NSColor?, frame: Int) -> NSImage {
         let key = "\(animStyle.rawValue)|\(frame)|\(color == nil)"
         if let cached = iconCache[key] { return cached }
@@ -1558,9 +1440,6 @@ final class StatusController: NSObject, NSMenuDelegate {
 
     func buildIconImage(color: NSColor?, frame: Int) -> NSImage {
         if animStyle == .tunduk { return TundukRenderer.image(color: color, frame: frame) }
-        if animStyle == .web { return tint(frames, color: color, frame: frame) }
-        if animStyle == .crab { return crabIcon(color: color, frame: frame) }
-        if animStyle == .mark { return markIcon(color: color, frame: frame) }
         let i = (frame / codeSub) % codeGlyphs.count
         let local = (CGFloat(frame % codeSub) + 0.5) / CGFloat(codeSub) // 0…1 within this glyph
         // Scale envelope per glyph: rise, hold at peak, fall, so each lands before the swap.
@@ -1622,79 +1501,8 @@ final class StatusController: NSObject, NSMenuDelegate {
         }
     }
 
-    let logoSet: [NSImage] = Data(base64Encoded: restingMarkPNG).flatMap(NSImage.init(data:)).map { [$0] } ?? []
-    func restingIcon(color: NSColor?) -> NSImage {
-        if animStyle == .tunduk { return flattened(TundukRenderer.image(color: color)) }
-        if animStyle == .crab { return crabIcon(color: color, frame: 0) }
-        if animStyle == .mark, let logo = logoSet.first {
-            return markLayer(logo, color: color, scale: markSparkScale)
-        }
-        return tint(logoSet.isEmpty ? frames : logoSet, color: color, frame: 0)
-    }
-
-    func markLayer(_ mask: NSImage, color: NSColor?, scale: CGFloat) -> NSImage {
-        let s: CGFloat = 18, d = s * scale
-        let r = NSRect(x: (s - d) / 2, y: (s - d) / 2, width: d, height: d)
-        let scaled = NSImage(size: NSSize(width: s, height: s), flipped: false) { _ in
-            mask.draw(in: r, from: .zero, operation: .sourceOver, fraction: 1.0)
-            return true
-        }
-        let img = NSImage(size: NSSize(width: s, height: s), flipped: false) { rect in
-            if let c = color {
-                c.setFill()
-                rect.fill()
-                scaled.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-            } else {
-                scaled.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
-            }
-            return true
-        }
-        img.isTemplate = (color == nil)
-        return img
-    }
-
-    func markIcon(color: NSColor?, frame: Int) -> NSImage {
-        guard frame >= 0, frame < markSequence.count else { return restingIcon(color: color) }
-        let step = markSequence[frame]
-        guard let strip = markFrames[step.strip], step.frame < strip.count else {
-            return NSImage(size: NSSize(width: 18, height: 18))
-        }
-        var sparkAlpha: CGFloat = 0
-        if step.strip == "en110", step.frame < markFadeFrames {
-            sparkAlpha = 1 - (CGFloat(step.frame) + 1) / CGFloat(markFadeFrames)
-        } else if step.strip == "ex40" {
-            let tail = strip.count - step.frame - 1
-            if tail < markFadeFrames { sparkAlpha = 1 - CGFloat(tail) / CGFloat(markFadeFrames) }
-        }
-        let dots = markLayer(strip[step.frame], color: color, scale: markDotScale)
-        guard sparkAlpha > 0, let logo = logoSet.first else { return dots }
-        let spark = markLayer(logo, color: color, scale: markSparkScale)
-        let img = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
-            dots.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1 - sparkAlpha)
-            spark.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: sparkAlpha)
-            return true
-        }
-        img.isTemplate = (color == nil)
-        return img
-    }
-
-    // nil color (System) => adaptive shaded template (see adaptiveCrabFrame in CrabRender.swift);
-    // non-nil (Orange) => the original full-color sprite, drawn as-is.
-    func crabIcon(color: NSColor?, frame: Int) -> NSImage {
-        guard !crabFrames.isEmpty else { return NSImage(size: NSSize(width: 18, height: 18)) }
-        let pool = color == nil ? crabTemplateFrames : crabFrames
-        let src = pool[frame % pool.count]
-        let rep = src.representations.first
-        let pw = CGFloat(rep?.pixelsWide ?? Int(src.size.width))
-        let ph = CGFloat(rep?.pixelsHigh ?? Int(src.size.height))
-        let h: CGFloat = 18, w = (ph > 0 ? h * (pw / ph) : h)
-        let img = NSImage(size: NSSize(width: w, height: h), flipped: false) { rect in
-            src.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
-            return true
-        }
-        img.isTemplate = (color == nil)
-        return img
-    }
+    // Every style rests on the still tündük mark.
+    func restingIcon(color: NSColor?) -> NSImage { flattened(TundukRenderer.image(color: color)) }
 
     func dotIcon(color: NSColor?) -> NSImage {
         let s: CGFloat = 18, d: CGFloat = 9
@@ -1704,25 +1512,6 @@ final class StatusController: NSObject, NSMenuDelegate {
             return true
         }
         img.isTemplate = (color == nil)
-        return img
-    }
-
-    // Paint `color` through a frame mask's alpha (destinationIn) so frames recolor.
-    func tint(_ set: [NSImage], color: NSColor?, frame: Int) -> NSImage {
-        let s: CGFloat = 18
-        guard !set.isEmpty else { return NSImage(size: NSSize(width: s, height: s)) }
-        let mask = set[frame % set.count]
-        let img = NSImage(size: NSSize(width: s, height: s), flipped: false) { rect in
-            if let c = color {
-                c.setFill()
-                rect.fill()
-                mask.draw(in: rect, from: .zero, operation: .destinationIn, fraction: 1.0)
-            } else {
-                mask.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1.0)
-            }
-            return true
-        }
-        img.isTemplate = (color == nil) // nil => adaptive black/white in the menu bar
         return img
     }
 }

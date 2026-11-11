@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Maps an agent hook event to this session's file: ~/.claude/statusbar/state.d/<session_id>.json
+// Maps an agent hook event to this session's file: ~/.agents-status-bar/state.d/<session_id>.json
 // Usage: node update.js <prompt|pre|post|notify|permreq|stop|interrupt> [--source=claude|codex]
 // The source defaults to claude, so hook commands installed by older versions keep working.
 

@@ -2,17 +2,17 @@
 // Each source adapter in ./sources/ only turns its own hook payload + env into the normalized
 // session record; everything else (paths, atomic writes, the app relaunch) lives here.
 //
-// The state dir sits under ~/.claude for historical reasons, but it is source-neutral: every
-// agent writes its sessions to the same state.d/, and the app aggregates them all.
+// Every agent writes its sessions to the same ~/.agents-status-bar/state.d/, and the app
+// aggregates them all.
 
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const cp = require("child_process");
 
-const BUNDLE_ID = "com.local.claudestatusbar";
-const EXEC = "ClaudeStatusBar";
-const dir = path.join(os.homedir(), ".claude", "statusbar");
+const BUNDLE_ID = "app.vdoske.agentsstatusbar";
+const EXEC = "AgentsStatusBar";
+const dir = path.join(os.homedir(), ".agents-status-bar");
 const stateDir = path.join(dir, "state.d");
 // Written by the app's Quit menu item; suppresses the self-heal relaunch so Quit sticks.
 // lifecycle.js removes it on the next SessionStart (a new session = fresh consent).
@@ -47,7 +47,9 @@ const statePathFor = (sessionId) => path.join(stateDir, safeId(sessionId) + ".js
 
 const appRunning = () => { try { cp.execSync(`pgrep -x ${EXEC}`, { stdio: "ignore" }); return true; } catch { return false; } };
 
+// AGENTS_STATUSBAR_NO_LAUNCH=1 (used by the test suite) records state without opening the app.
 const openApp = () => {
+  if (process.env.AGENTS_STATUSBAR_NO_LAUNCH === "1") return;
   try { cp.spawn("open", ["-g", "-b", BUNDLE_ID], { stdio: "ignore", detached: true }).unref(); } catch {}
 };
 
@@ -75,9 +77,9 @@ function readPayload(fn, timeoutMs = 1000) {
   setTimeout(finish, timeoutMs).unref();
 }
 
-// Off by default; CLAUDE_STATUSBAR_DEBUG=1 logs every hook invocation to hooks.log.
+// Off by default; AGENTS_STATUSBAR_DEBUG=1 logs every hook invocation to hooks.log.
 function debugLog(source, event, p) {
-  if (process.env.CLAUDE_STATUSBAR_DEBUG !== "1") return;
+  if (process.env.AGENTS_STATUSBAR_DEBUG !== "1") return;
   try {
     fs.mkdirSync(dir, { recursive: true });
     fs.appendFileSync(path.join(dir, "hooks.log"),

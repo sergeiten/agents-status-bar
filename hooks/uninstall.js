@@ -8,18 +8,13 @@ const cp = require("child_process");
 
 const home = os.homedir();
 // Match the dir, not "update.js": the narrower marker used to orphan the lifecycle hooks.
-const MARKER = path.join(home, ".claude", "statusbar");
+const MARKER = path.join(home, ".agents-status-bar");
 const shellQuote = (value) => `'${value.replace(/'/g, `'\\''`)}'`;
 const quotedMarkerPrefix = shellQuote(MARKER).slice(0, -1);
 const isOurs = (command) =>
   command.includes(MARKER) || command.includes(quotedMarkerPrefix);
 
-// Tear down the desktop watcher LaunchAgent (best-effort; safe if absent).
-const AGENT_LABEL = "com.local.claudestatusbar.watcher";
-const agentPlist = path.join(home, "Library", "LaunchAgents", AGENT_LABEL + ".plist");
-try { cp.execSync(`launchctl bootout gui/${process.getuid()}/${AGENT_LABEL}`, { stdio: "ignore" }); } catch {}
-if (fs.existsSync(agentPlist)) { fs.rmSync(agentPlist); console.log("Removed desktop watcher LaunchAgent."); }
-try { cp.execSync("pkill -x ClaudeStatusBar", { stdio: "ignore" }); } catch {}
+try { cp.execSync("pkill -x AgentsStatusBar", { stdio: "ignore" }); } catch {}
 
 const targets = [
   path.join(home, ".claude", "settings.json"), // Claude Code

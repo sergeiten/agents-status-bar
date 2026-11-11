@@ -1,14 +1,12 @@
 #!/bin/bash
-# Builds ClaudeStatusBar.app (and optionally a .dmg with: ./build.sh --dmg).
+# Builds Agents Status Bar.app (and optionally a .dmg with: ./build.sh --dmg).
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# 0.4.0: the bundle folder is "Claude Status Bar.app" (matches the cask token claude-status-bar,
-# promised in homebrew-cask PR #274337). The EXECUTABLE stays "ClaudeStatusBar": lifecycle.js
-# pgreps that name and opens by bundle id, and every pkill/dev instruction relies on it, so only
-# the folder name changes.
-APP="build/Claude Status Bar.app"
-BIN="$APP/Contents/MacOS/ClaudeStatusBar"
+# The executable name "AgentsStatusBar" matters: the hooks (hooks/core.js) pgrep it and open the
+# app by its bundle id, and the Makefile / uninstaller pkill it.
+APP="build/Agents Status Bar.app"
+BIN="$APP/Contents/MacOS/AgentsStatusBar"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
@@ -28,12 +26,12 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>ClaudeStatusBar</string>
-  <key>CFBundleDisplayName</key><string>Claude Status Bar</string>
-  <key>CFBundleIdentifier</key><string>com.local.claudestatusbar</string>
-  <key>CFBundleExecutable</key><string>ClaudeStatusBar</string>
-  <key>CFBundleVersion</key><string>0.4.5</string>
-  <key>CFBundleShortVersionString</key><string>0.4.5</string>
+  <key>CFBundleName</key><string>AgentsStatusBar</string>
+  <key>CFBundleDisplayName</key><string>Agents Status Bar</string>
+  <key>CFBundleIdentifier</key><string>app.vdoske.agentsstatusbar</string>
+  <key>CFBundleExecutable</key><string>AgentsStatusBar</string>
+  <key>CFBundleVersion</key><string>1.0.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
@@ -57,18 +55,22 @@ cp assets/sounds/*.mp3 "$APP/Contents/Resources/sounds/"
 # For a clean (no Gatekeeper warning) release you need, set up once on this Mac:
 #   1. A "Developer ID Application" certificate in your keychain (Xcode > Settings > Accounts).
 #   2. A notarytool credential profile:
-#        xcrun notarytool store-credentials "claude-statusbar" \
-#          --apple-id you@example.com --team-id W9JZ4932LA --password <app-specific-password>
-# Then `./build.sh --dmg` auto-signs + notarizes. Without a cert it falls back to an
-# ad-hoc dev build (runnable locally; users would need right-click > Open once).
-TEAM_ID="W9JZ4932LA"
-NOTARY_PROFILE="${NOTARY_PROFILE:-claude-statusbar}"
+#        xcrun notarytool store-credentials "agents-status-bar" \
+#          --apple-id you@example.com --team-id <YOUR_TEAM_ID> --password <app-specific-password>
+# Then `TEAM_ID=<YOUR_TEAM_ID> ./build.sh --dmg` auto-signs + notarizes. Without TEAM_ID (or
+# without a matching cert) it falls back to an ad-hoc dev build (runnable locally; users would
+# need right-click > Open once).
+TEAM_ID="${TEAM_ID:-}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-agents-status-bar}"
 
 # `|| true` so a missing Developer ID cert (grep matches nothing → nonzero, which `set -eo pipefail`
 # would otherwise treat as a fatal error) falls through to the ad-hoc dev build below instead of
 # aborting the whole script.
-SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep "Developer ID Application" | grep "$TEAM_ID" | head -1 | sed -E 's/.*"(.*)"/\1/')" || true
+SIGN_ID=""
+if [[ -n "$TEAM_ID" ]]; then
+  SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null \
+    | grep "Developer ID Application" | grep "($TEAM_ID)" | head -1 | sed -E 's/.*"(.*)"/\1/')" || true
+fi
 
 # Strip extended attributes (Finder info, quarantine, etc.) that bundled resources can
 # carry — codesign rejects them ("resource fork, Finder information, ... not allowed").
@@ -78,7 +80,7 @@ if [[ -n "$SIGN_ID" ]]; then
   echo "Signing with Developer ID: $SIGN_ID"
   codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
 else
-  echo "No Developer ID cert for team $TEAM_ID found — ad-hoc signing (local dev build)."
+  echo "No Developer ID cert${TEAM_ID:+ for team $TEAM_ID} found — ad-hoc signing (local dev build)."
   codesign --force --sign - "$APP" >/dev/null 2>&1 || true
 fi
 echo "Built $APP"
@@ -98,26 +100,26 @@ if [[ "${1:-}" == "--dmg" ]]; then
   fi
 
   echo "Packaging DMG…"
-  DMG="build/ClaudeStatusBar.dmg"
+  DMG="build/AgentsStatusBar.dmg"
   STAGE="build/dmg-stage"
   rm -rf "$STAGE" "$DMG" build/rw.dmg
   mkdir -p "$STAGE"
   cp -R "$APP" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"
 
-  # Eject any stale "Claude Status Bar" volumes from earlier builds first. Otherwise a name
-  # collision mounts this one as "Claude Status Bar 2", the hardcoded /Volumes path below points
+  # Eject any stale "Agents Status Bar" volumes from earlier builds first. Otherwise a name
+  # collision mounts this one as "Agents Status Bar 2", the hardcoded /Volumes path below points
   # at the wrong volume (layout capture silently fails), and the stale mounts pile up in Finder.
-  for d in $(hdiutil info | awk '/Claude Status Bar/ {print $1}'); do hdiutil detach "$d" >/dev/null 2>&1 || true; done
+  for d in $(hdiutil info | awk '/Agents Status Bar/ {print $1}'); do hdiutil detach "$d" >/dev/null 2>&1 || true; done
 
   # Lay out the window on a read-write image to capture its .DS_Store, then build the final
   # image from the folder (see below).
-  hdiutil create -volname "Claude Status Bar" -srcfolder "$STAGE" -ov -format UDRW build/rw.dmg >/dev/null
+  hdiutil create -volname "Agents Status Bar" -srcfolder "$STAGE" -ov -format UDRW build/rw.dmg >/dev/null
   device="$(hdiutil attach -readwrite -noverify -noautoopen build/rw.dmg | grep -E '^/dev/' | head -1 | awk '{print $1}')"
   sleep 1
   osascript <<'OSA' || echo "(Finder layout skipped — DMG still has the app + Applications shortcut)"
 tell application "Finder"
-  tell disk "Claude Status Bar"
+  tell disk "Agents Status Bar"
     open
     set current view of container window to icon view
     set toolbar visible of container window to false
@@ -127,7 +129,7 @@ tell application "Finder"
     set arrangement of vo to not arranged
     set icon size of vo to 100
     set text size of vo to 12
-    set position of item "Claude Status Bar.app" of container window to {130, 150}
+    set position of item "Agents Status Bar.app" of container window to {130, 150}
     set position of item "Applications" of container window to {350, 150}
     update without registering applications
     delay 1
@@ -140,20 +142,20 @@ OSA
   # writable volume, so macOS's fseventsd never creates a hidden .fseventsd in the shipped DMG.
   # (Removing .fseventsd from a mounted volume does not stick: the removal is itself an event
   # fseventsd logs, which recreates the folder.)
-  cp "/Volumes/Claude Status Bar/.DS_Store" "$STAGE/.DS_Store" 2>/dev/null || true
+  cp "/Volumes/Agents Status Bar/.DS_Store" "$STAGE/.DS_Store" 2>/dev/null || true
   hdiutil detach "$device" >/dev/null || true
   rm -f build/rw.dmg
   # Scrub any hidden folder that may have accrued (.fseventsd, .Trashes, .Spotlight-V100, …),
   # keeping only the intentional .DS_Store that carries the window layout.
   find "$STAGE" -maxdepth 1 -name ".*" ! -name ".DS_Store" -exec rm -rf {} + 2>/dev/null || true
-  hdiutil create -volname "Claude Status Bar" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+  hdiutil create -volname "Agents Status Bar" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
   rm -rf "$STAGE"
 
   # Guard: the shipped image must hold nothing but the app, the Applications symlink, and the
   # .DS_Store layout file. Mount read-only and abort before notarizing if any stray hidden entry
   # slipped in (the recurring .fseventsd/.Trashes problem).
   vdev="$(hdiutil attach -nobrowse -noautoopen -readonly "$DMG" | grep -E '^/dev/' | tail -1 | awk '{print $1}')"
-  stray="$(find "/Volumes/Claude Status Bar" -maxdepth 1 -name ".*" ! -name ".DS_Store" 2>/dev/null)"
+  stray="$(find "/Volumes/Agents Status Bar" -maxdepth 1 -name ".*" ! -name ".DS_Store" 2>/dev/null)"
   hdiutil detach "$vdev" >/dev/null 2>&1 || true
   if [[ -n "$stray" ]]; then
     echo "ERROR: DMG has stray hidden entries, aborting before notarize:"; echo "$stray"; exit 1

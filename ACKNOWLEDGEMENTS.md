@@ -1,6 +1,8 @@
 # Acknowledgements
 
-Claude Status Bar's multi-session support grew out of several community contributions. Thank you to:
+Agents Status Bar is based on [Claude Status Bar](https://github.com/m1ckc3s/claude-status-bar) by **Mick Cesanek**, used under the MIT License. Most of the app's foundations, from session tracking to the self-quitting lifecycle, are his work.
+
+The original project grew out of several community contributions, credited here as they were in Claude Status Bar. Thank you to:
 
 - **[@BrennenRocks](https://github.com/BrennenRocks)**, [PR #13](https://github.com/m1ckc3s/claude-status-bar/pull/13): the per-session / multi-session implementation. Major contributions here.
 - **[@marcosarzuza](https://github.com/marcosarzuza)**, [PR #11](https://github.com/m1ckc3s/claude-status-bar/pull/11): the early multi-session precursor, plus multi-CLI testing and feedback.

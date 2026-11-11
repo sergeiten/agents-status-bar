@@ -3,31 +3,20 @@
 // existing hooks:
 //   - Claude Code: ~/.claude/settings.json (always)
 //   - OpenAI Codex: ~/.codex/hooks.json (only if ~/.codex exists, i.e. Codex is installed)
-// Copies the hook scripts to ~/.claude/statusbar/. Re-runnable: existing status-bar hooks are
+// Copies the hook scripts to ~/.agents-status-bar/. Re-runnable: existing status-bar hooks are
 // stripped before re-adding.
 
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const cp = require("child_process");
 
 const home = os.homedir();
-const sbDir = path.join(home, ".claude", "statusbar");
+const sbDir = path.join(home, ".agents-status-bar");
 const MARKER = sbDir; // every hook command we add points inside this dir
 const updateDest = path.join(sbDir, "update.js");
 const lifecycleDest = path.join(sbDir, "lifecycle.js");
 
-// Retire the old 0.0.2 background watcher LaunchAgent on upgrade (0.0.3+ self-quits).
-const OLD_AGENT_LABEL = "com.local.claudestatusbar.watcher";
-const oldAgentPlist = path.join(home, "Library", "LaunchAgents", OLD_AGENT_LABEL + ".plist");
-try { cp.execSync(`launchctl bootout gui/${process.getuid()}/${OLD_AGENT_LABEL}`, { stdio: "ignore" }); } catch {}
-if (fs.existsSync(oldAgentPlist)) { fs.rmSync(oldAgentPlist); console.log("Removed old desktop watcher LaunchAgent."); }
-
 fs.mkdirSync(sbDir, { recursive: true });
-fs.rmSync(path.join(sbDir, "watcher.sh"), { force: true });
-// Retire pre-multi-session artifacts (single global state + empty liveness markers).
-fs.rmSync(path.join(sbDir, "state.json"), { force: true });
-fs.rmSync(path.join(sbDir, "sessions.d"), { recursive: true, force: true });
 // The hook scripts: two entry points, the shared core, and one adapter per source.
 for (const f of ["update.js", "lifecycle.js", "core.js"]) fs.copyFileSync(path.join(__dirname, f), path.join(sbDir, f));
 fs.mkdirSync(path.join(sbDir, "sources"), { recursive: true });

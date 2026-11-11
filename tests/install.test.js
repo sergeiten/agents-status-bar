@@ -57,7 +57,10 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
 
   const claudeDir = path.join(home, ".claude");
   const settingsPath = path.join(claudeDir, "settings.json");
-  const oldScript = path.join(claudeDir, "statusbar", "update.js");
+  const sbDir = path.join(home, ".agents-status-bar");
+  const oldScript = path.join(sbDir, "update.js");
+  // The original Claude Status Bar's hook: a separate app, so ours must leave it alone.
+  const upstreamCommand = `node ${path.join(claudeDir, "statusbar", "update.js")} pre`;
   const unrelatedCommand = "echo keep-me";
   const original = {
     customSetting: true,
@@ -68,6 +71,7 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
           hooks: [
             { type: "command", command: `${staleNode} ${oldScript} pre` },
             { type: "command", command: unrelatedCommand },
+            { type: "command", command: upstreamCommand },
             { type: "prompt" },
           ],
         },
@@ -77,25 +81,17 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
   };
   fs.mkdirSync(claudeDir, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(original, null, 2));
-  const oldAgentPlist = path.join(
-    home,
-    "Library",
-    "LaunchAgents",
-    "com.local.claudestatusbar.watcher.plist",
-  );
-  fs.mkdirSync(path.dirname(oldAgentPlist), { recursive: true });
-  fs.writeFileSync(oldAgentPlist, "obsolete");
 
   runInstaller(home);
 
   const settings = readSettings(home);
   const allCommands = hookCommands(settings);
   const commands = statusBarCommands(settings);
-  const updatePath = path.join(claudeDir, "statusbar", "update.js");
-  const lifecyclePath = path.join(claudeDir, "statusbar", "lifecycle.js");
+  const updatePath = path.join(sbDir, "update.js");
+  const lifecyclePath = path.join(sbDir, "lifecycle.js");
 
   assert.equal(settings.customSetting, true);
-  assert.equal(fs.existsSync(oldAgentPlist), false);
+  assert.equal(allCommands.filter((command) => command === upstreamCommand).length, 1);
   assert.equal(commands.length, 8);
   assert.ok(commands.every((command) => command.startsWith(nodePathPrefix)));
   assert.ok(allCommands.every((command) => !command.includes(staleNode)));
@@ -107,12 +103,7 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
   const fixtureBin = path.join(home, "minimal-bin");
   fs.mkdirSync(fixtureBin);
   fs.symlinkSync(process.execPath, path.join(fixtureBin, "node"));
-  const statePath = path.join(
-    claudeDir,
-    "statusbar",
-    "state.d",
-    "quoted-path-test.json",
-  );
+  const statePath = path.join(sbDir, "state.d", "quoted-path-test.json");
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   fs.writeFileSync(statePath, "{}");
   const fixtureCommand = lifecycleEnd.replace(
@@ -157,6 +148,7 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
   const uninstalled = readSettings(home);
   assert.equal(statusBarCommands(uninstalled).length, 0);
   assert.equal(uninstalled.customSetting, true);
+  assert.equal(hookCommands(uninstalled).filter((command) => command === upstreamCommand).length, 1);
   assert.equal(
     uninstalled.hooks.PreToolUse.flatMap((entry) => entry.hooks).filter(
       (hook) => hook.command === unrelatedCommand,
@@ -166,7 +158,7 @@ test("installs portable, quoted hook commands and replaces stale hooks", (t) => 
 });
 
 test("reinstalling is idempotent", (t) => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "claude status bar test-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agents status bar test-"));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
 
   runInstaller(home);
@@ -179,7 +171,7 @@ test("reinstalling is idempotent", (t) => {
 });
 
 test("an empty inherited PATH never searches the working directory", (t) => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "claude status bar security test-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "agents status bar security test-"));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
 
   runInstaller(home);

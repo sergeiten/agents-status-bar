@@ -1,12 +1,12 @@
 .PHONY: build dmg test run clean icons preview-icons sound-candidates
 
-APP := build/Claude Status Bar.app
+APP := build/Agents Status Bar.app
 
-## Build the app bundle (build/Claude Status Bar.app)
+## Build the app bundle (build/Agents Status Bar.app)
 build:
 	./build.sh
 
-## Build the app and package a signed DMG (build/ClaudeStatusBar.dmg)
+## Build the app and package a signed DMG (build/AgentsStatusBar.dmg)
 dmg:
 	./build.sh --dmg
 
@@ -14,7 +14,7 @@ dmg:
 test:
 	node --test tests/*.test.js
 
-## Regenerate the tündük SVGs, native paths, resting mask and app icon
+## Regenerate the tündük SVGs, native paths and app icon
 icons:
 	python3 scripts/generate-tunduk.py
 	swift -module-cache-path build/swift-module-cache scripts/render-mark.swift build
@@ -31,7 +31,7 @@ sound-candidates:
 
 ## Build, then relaunch the freshly built app
 run: build
-	-pkill -x ClaudeStatusBar
+	-pkill -x AgentsStatusBar
 	open "$(APP)"
 
 ## Remove build output
